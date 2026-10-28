@@ -115,6 +115,23 @@ function persist() {
   fs.writeFileSync(versionFile, JSON.stringify(store, null, 2));
 }
 
+const LIMITED =
+  /rate limit|too many requests|usage cap|reached (the|your) limit|message cap|try again later|已达到使用上限|达到上限|请求过于频繁|稍后再试|容量不足/i;
+
+function nextOwn(spec) {
+  const index = spec.accounts.findIndex((account) => account.id === spec.active);
+  return spec.accounts[(index + 1) % spec.accounts.length];
+}
+
+async function pageState(page) {
+  const title = await page.title().catch(() => "");
+  const url = page.url();
+  if (hint(url, title) === "需要接管") return "handoff";
+  const text = await page.evaluate(() => (document.body?.innerText || "").slice(0, 2500)).catch(() => "");
+  if (LIMITED.test(`${title}\n${text}`)) return "limited";
+  return "ready";
+}
+
 function hint(url, title = "") {
   const blob = `${url} ${title}`.toLowerCase();
   if (!String(url || "").startsWith("http")) return "未打开";
@@ -216,14 +233,48 @@ async function shot(id) {
   return { ok: true, image, url, title, hint: hint(url, title) };
 }
 
-async function deliver(id, text) {
-  const seat = await openSeat(id);
+async function deliver(id, text, rotate) {
+  const spec = store.recipe.seats[id];
+  if (!spec) throw new Error("没有这一席");
+  if (rotate) {
+    if (spec.accounts.length < 2) return { ok: false, reason: "只有一个号，没有可轮换的" };
+    spec.active = nextOwn(spec).id;
+    persist();
+  }
   const preface = store.recipe.preface.trim();
   const full = preface ? `${preface}\n\n${text}` : text;
-  const result = await seat.page.evaluate(fillSeat, full, id);
-  logCall({ seat: id, text: text.slice(0, 80), ok: Boolean(result?.ok), version: store.active });
-  if (!result?.ok) return { ok: false, reason: result?.reason || "没送进页面", version: store.active };
-  return { ...result, version: store.active };
+  const skipped = [];
+  const start = spec.active;
+  do {
+    const label = spec.accounts.find((account) => account.id === spec.active)?.label || spec.active;
+    const seat = await openSeat(id);
+    const state = await pageState(seat.page);
+    if (state === "handoff" || state === "limited") {
+      skipped.push(`${label}:${state === "handoff" ? "要接管" : "被限"}`);
+      if (spec.accounts.length < 2) break;
+      spec.active = nextOwn(spec).id;
+      persist();
+      if (spec.active === start) break;
+      continue;
+    }
+    const result = await seat.page.evaluate(fillSeat, full, id);
+    if (!result?.ok) {
+      logCall({ seat: id, text: text.slice(0, 80), ok: false, version: store.active });
+      return { ok: false, reason: result?.reason || "没送进页面", account: label, skipped, version: store.active };
+    }
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    const after = await pageState(seat.page);
+    if (after === "limited" && spec.accounts.length > 1) {
+      skipped.push(`${label}:被限`);
+      spec.active = nextOwn(spec).id;
+      persist();
+      if (spec.active === start) break;
+      continue;
+    }
+    logCall({ seat: id, text: text.slice(0, 80), ok: true, version: store.active });
+    return { ...result, ok: true, account: label, skipped, version: store.active };
+  } while (spec.active !== start);
+  return { ok: false, reason: "你自己的号都过不去这一轮", skipped, version: store.active };
 }
 
 function readJson(req) {
@@ -322,7 +373,7 @@ const server = http.createServer(async (req, res) => {
         store.recipe = cleanRecipe(item.recipe);
         persist();
       }
-      return send(200, await deliver(id, text));
+      return send(200, await deliver(id, text, Boolean(body.rotate)));
     }
     if (url.pathname === "/v1/recipe") {
       store.recipe = cleanRecipe({ ...store.recipe, ...body, seats: body.seats || store.recipe.seats });
