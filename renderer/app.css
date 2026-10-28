@@ -1,0 +1,92 @@
+:root {
+  color-scheme: dark;
+  --ink: #101210;
+  --panel: #171b18;
+  --parchment: #e7eee6;
+  --faint: #9aa397;
+  --line: #2a312c;
+  --copper: #d6b17a;
+  --sage: #9cba8a;
+  --clay: #d48474;
+  font-family: "IBM Plex Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--ink);
+  color: var(--parchment);
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 14px 18px;
+  overflow: auto;
+}
+
+header { display: flex; gap: 10px; align-items: center; }
+.mark {
+  margin: 0;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--copper);
+  color: var(--copper);
+  font-family: Georgia, "Songti SC", serif;
+}
+h1 {
+  margin: 0;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 22px;
+  font-weight: 500;
+}
+header p { margin: 2px 0 0; color: var(--faint); font-size: 12px; }
+
+#seats { display: flex; flex-direction: column; gap: 6px; }
+.seat {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.seat.on { border-color: var(--copper); }
+.seat b { display: block; font-weight: 500; }
+.seat small { color: var(--faint); }
+.seat .hint { font-size: 11px; color: var(--sage); }
+.seat .hint.wait { color: var(--clay); }
+
+.modes, .actions { display: flex; gap: 6px; }
+button {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--parchment);
+  padding: 7px 10px;
+  cursor: pointer;
+}
+button.on, #send { border-color: var(--copper); color: var(--copper); }
+.ghost { color: var(--faint); }
+
+.composer { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--faint); }
+textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 120px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--parchment);
+  padding: 10px;
+  font: inherit;
+}
+.log { margin: 0; color: var(--faint); font-size: 12px; line-height: 1.5; }

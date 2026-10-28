@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>汇线</title>
+    <link rel="stylesheet" href="./app.css" />
+  </head>
+  <body>
+    <header>
+      <p class="mark">汇</p>
+      <div>
+        <h1>汇线</h1>
+        <p>四个网页账号，一个窗口。不是 API。</p>
+      </div>
+    </header>
+    <section id="seats"></section>
+    <div class="modes" role="tablist">
+      <button type="button" id="mode-one" class="on" role="tab">单席</button>
+      <button type="button" id="mode-all" role="tab">并送</button>
+      <button type="button" id="tile" role="tab">四格</button>
+    </div>
+    <label class="composer">
+      <span>送到登录着的网页里</span>
+      <textarea id="draft" rows="6" placeholder="写一句。单席只送当前这一页；并送会送到勾着的每一席。"></textarea>
+    </label>
+    <div class="actions">
+      <button type="button" id="send">送出</button>
+      <button type="button" id="pass" class="ghost">交给下一席</button>
+    </div>
+    <p id="log" class="log">点一席，在右边的官方页面里登录。登录态留在这台电脑的分区里。</p>
+    <script src="./app.js"></script>
+  </body>
+</html>

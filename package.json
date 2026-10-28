@@ -1,0 +1,17 @@
+{
+  "name": "huixian",
+  "version": "0.1.0",
+  "private": false,
+  "description": "一个窗口里登录 ChatGPT、Claude、Gemini、Grok。用的是各家网页账号，不是 API key。",
+  "main": "main.js",
+  "author": "汇线",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "check": "node --check main.js && node --check preload.js && node --check inject.js",
+    "test": "node test-inject.js"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11"
+  }
+}
