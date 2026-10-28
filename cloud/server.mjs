@@ -33,9 +33,24 @@ function recipeFrom(preface = "") {
   return {
     preface,
     seats: Object.fromEntries(
-      Object.entries(DEFAULTS).map(([id, seat]) => [id, { name: seat.name, home: seat.home }]),
+      Object.entries(DEFAULTS).map(([id, seat]) => [id, seatShape(seat.name, seat.home)]),
     ),
   };
+}
+
+function seatShape(name, home, previous) {
+  const accounts = Array.isArray(previous?.accounts)
+    ? previous.accounts
+        .filter((account) => account && /^[a-z0-9]{2,16}$/i.test(account.id))
+        .slice(0, 6)
+        .map((account) => ({
+          id: account.id,
+          label: String(account.label || "账号").slice(0, 24),
+        }))
+    : [];
+  const list = accounts.length ? accounts : [{ id: "a1", label: "主号" }];
+  const active = list.some((account) => account.id === previous?.active) ? previous.active : list[0].id;
+  return { name, home, active, accounts: list };
 }
 
 function allowedHome(value) {
@@ -52,8 +67,9 @@ function cleanRecipe(input) {
   const preface = String(input?.preface || "").slice(0, 400);
   next.preface = preface;
   for (const id of Object.keys(DEFAULTS)) {
-    const home = input?.seats?.[id]?.home;
-    if (typeof home === "string" && allowedHome(home)) next.seats[id].home = home;
+    const previous = input?.seats?.[id];
+    const home = typeof previous?.home === "string" && allowedHome(previous.home) ? previous.home : next.seats[id].home;
+    next.seats[id] = seatShape(DEFAULTS[id].name, home, previous);
   }
   return next;
 }
@@ -122,7 +138,7 @@ function snapshot() {
     versions: store.versions.map(({ recipe, ...rest }) => rest),
     calls,
     seats: Object.entries(store.recipe.seats).map(([id, seat]) => {
-      const page = live.get(id)?.page;
+      const page = live.get(`${id}:${seat.active}`)?.page;
       const url = page && !page.isClosed() ? page.url() : "";
       return {
         id,
@@ -131,39 +147,64 @@ function snapshot() {
         open: Boolean(page && !page.isClosed()),
         url,
         hint: hint(url),
+        active: seat.active,
+        accounts: seat.accounts,
       };
     }),
   };
 }
 
+function profileDir(id, accountId) {
+  const legacy = path.join(dataDir, "profiles", id);
+  if (accountId === "a1" && fs.existsSync(path.join(legacy, "Default"))) return legacy;
+  const dir = path.join(dataDir, "profiles", id, "accounts", accountId);
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+let chromeChannel = null;
+
+async function launchContext(dir) {
+  const base = {
+    headless: true,
+    viewport: { width: 960, height: 600 },
+    locale: "zh-CN",
+  };
+  if (chromeChannel !== false) {
+    try {
+      const context = await chromium.launchPersistentContext(dir, { ...base, channel: "chrome" });
+      chromeChannel = true;
+      return context;
+    } catch {
+      chromeChannel = false;
+    }
+  }
+  return chromium.launchPersistentContext(dir, { ...base, userAgent: UA });
+}
+
 async function openSeat(id) {
   const spec = store.recipe.seats[id];
   if (!spec) throw new Error("没有这一席");
-  const existing = live.get(id);
+  const key = `${id}:${spec.active}`;
+  for (const [liveKey, open] of live) {
+    if (liveKey.startsWith(`${id}:`) && liveKey !== key) {
+      await open.context.close().catch(() => {});
+      live.delete(liveKey);
+    }
+  }
+  const existing = live.get(key);
   if (existing && !existing.page.isClosed()) {
     if (existing.page.url() === "about:blank") {
       await existing.page.goto(spec.home, { waitUntil: "domcontentloaded", timeout: 25000 });
     }
     return existing;
   }
-  const dir = path.join(dataDir, "profiles", id);
-  fs.mkdirSync(dir, { recursive: true });
-  const context = await chromium.launchPersistentContext(dir, {
-    headless: true,
-    viewport: { width: 960, height: 600 },
-    userAgent: UA,
-    locale: "zh-CN",
-    ignoreDefaultArgs: ["--enable-automation"],
-    args: ["--disable-blink-features=AutomationControlled"],
-  });
-  await context.addInitScript(() => {
-    Object.defineProperty(navigator, "webdriver", { get: () => undefined });
-  });
+  const context = await launchContext(profileDir(id, spec.active));
   const page = context.pages()[0] || (await context.newPage());
   page.setDefaultNavigationTimeout(25000);
   await page.goto(spec.home, { waitUntil: "domcontentloaded", timeout: 25000 }).catch(() => {});
   const seat = { context, page };
-  live.set(id, seat);
+  live.set(key, seat);
   return seat;
 }
 
@@ -223,6 +264,30 @@ const server = http.createServer(async (req, res) => {
     const body = await readJson(req);
     const id = body.seat;
     if (url.pathname === "/v1/open") {
+      await openSeat(id);
+      return send(200, snapshot());
+    }
+    if (url.pathname === "/v1/accounts/add") {
+      const spec = store.recipe.seats[id];
+      if (!spec) return send(404, { ok: false, error: "没有这一席" });
+      if (spec.accounts.length >= 6) return send(400, { ok: false, error: "这一席最多 6 个自己的号" });
+      const account = {
+        id: `a${Date.now().toString(36)}`,
+        label: String(body.label || "新号").trim().slice(0, 24) || "新号",
+      };
+      spec.accounts.push(account);
+      spec.active = account.id;
+      persist();
+      return send(200, snapshot());
+    }
+    if (url.pathname === "/v1/accounts/use") {
+      const spec = store.recipe.seats[id];
+      const accountId = String(body.account || "");
+      if (!spec?.accounts.some((account) => account.id === accountId)) {
+        return send(404, { ok: false, error: "没有这个号" });
+      }
+      spec.active = accountId;
+      persist();
       await openSeat(id);
       return send(200, snapshot());
     }
