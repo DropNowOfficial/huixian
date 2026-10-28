@@ -22,6 +22,33 @@ npm start
 
 右键页面可以粘贴、刷新、回到首页。Ctrl/⌘ + Enter 送出。
 
+## 云端
+
+0.2 把同一件事放到一台云电脑上：四块屏仍然隔开，登录留在服务器的 profile 里，人不在线也还在。
+
+```bash
+cd cloud && npm install && npx playwright install chromium && npm start
+```
+
+或者在仓库根目录：
+
+```bash
+docker compose up --build
+```
+
+然后调一次：
+
+```bash
+curl -s http://127.0.0.1:8787/v1/state
+curl -s -X POST http://127.0.0.1:8787/v1/call \
+  -H 'content-type: application/json' \
+  -d '{"seat":"gpt","text":"用一句话说你看见的页面"}'
+```
+
+改「送出前加上的话」，再点「做成新版本」，就是下一次迭代。`POST /v1/versions/use` 把某一版调回来。对外部署时设 `HUIXIAN_TOKEN`，请求带 `Authorization: Bearer ...`。
+
+画面上出现登录页或验证码时，状态是「需要接管」：点画面、打字、回车，由你自己登。程序不保存密码。
+
 ## 它做不到的
 
 各家没有「把我的 ChatGPT 会员登录授权给你」这种接口。所以这不是 API，也不是嵌入在别人网站里的 iframe。网页版产品嵌不进 `chatgpt.com`。

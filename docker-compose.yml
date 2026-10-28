@@ -1,0 +1,14 @@
+services:
+  huixian:
+    build:
+      context: .
+      dockerfile: cloud/Dockerfile
+    ports:
+      - "8787:8787"
+    volumes:
+      - huixian-data:/data
+    environment:
+      HUIXIAN_TOKEN: ${HUIXIAN_TOKEN:-}
+      HUIXIAN_HOST: 0.0.0.0
+volumes:
+  huixian-data:

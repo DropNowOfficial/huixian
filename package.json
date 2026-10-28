@@ -1,6 +1,6 @@
 {
   "name": "huixian",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": false,
   "description": "一个窗口里登录 ChatGPT、Claude、Gemini、Grok。用的是各家网页账号，不是 API key。",
   "main": "main.js",

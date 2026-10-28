@@ -1,0 +1,14 @@
+{
+  "name": "huixian-cloud",
+  "version": "0.2.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "汇线云端浏览器。一台电脑，四块隔开的屏。",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "playwright": "^1.49.1"
+  }
+}
